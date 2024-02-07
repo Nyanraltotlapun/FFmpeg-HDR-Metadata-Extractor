@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# FFmpegHDRMetadata is an HDR metadata extractor that uses ffprobe output.
+# FFmpeg HDR Metadata Extractor is an HDR metadata extractor that uses ffprobe output.
 #     Copyright (C) 2024  Kirill Harmatulla Shakirov
 #
 #     This program is free software: you can redistribute it and/or modify
@@ -229,7 +229,7 @@ if __name__ == '__main__':
 
     # Initialize arguments parser
     parser = argparse.ArgumentParser(
-        prog="HDR metadata extractor",
+        prog="get_hdr_metadata.py",
         description="This program parse HDR metadata from ffprobe output and generates ffmpeg parameters based on it.",
         epilog="Have a nice day!")
 
@@ -243,7 +243,7 @@ if __name__ == '__main__':
                         action="store",
                         type=int,
                         default=0,
-                        help="video stream number in the input file, default - 0.",
+                        help="video stream number in the input file, default 0.",
                         required=False)
 
     parser.add_argument("-e", "--ffprobe-binary",
