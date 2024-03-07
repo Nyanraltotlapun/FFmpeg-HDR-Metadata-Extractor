@@ -204,15 +204,14 @@ class ColorData:
         return ""
 
     # matrix-coefficients=<arg> Matrix coefficients (CICP) of input content:
-    # identity, bt709, unspecified, fcc73, bt470bg, bt601, smpte240, ycgco, bt2020ncl, bt2020cl, smpte2085, chromncl, chromcl, ictcp
+    # identity, bt709, unspecified, fcc73, bt470bg, bt601, smpte240,
+    # ycgco, bt2020ncl, bt2020cl, smpte2085, chromncl, chromcl, ictcp
     def to_libaom_av1_params(self) -> str:
         res = f"color-primaries={self.color_primaries}:transfer-characteristics={self.color_transfer}"
         mc = libaom_get_matrix_coefficients(self.color_space)
         if mc is not None:
             res += f":matrix-coefficients={mc}"
         return res
-
-
 
     # From Fastfix
     # if (fastflix.current_video.color_space and "bt2020" in fastflix.current_video.color_space):
@@ -223,6 +222,51 @@ class ColorData:
         if "bt2020" in self.color_space:
             res += ":matrix-coefficients=9"
         return res
+
+
+def parse_frame_data(frame_data: dict):
+    color_params = ["pix_fmt", "color_space", "color_primaries", "color_transfer"]
+
+    missing_params = [x for x in color_params if x not in frame_data.keys()]
+    if len(missing_params) != 0:
+        print(f"Missing {missing_params} parameters in frame metadata!")
+        print("Probably not an HDR stream!")
+        print("Exit!")
+        return
+
+    color_data = ColorData(frame_data)
+    print("Color Data:")
+    print(color_data)
+    print("")
+
+    x265_params: str = color_data.to_x265_params()
+    libaom_av1_params: str = color_data.to_libaom_av1_params()
+    libsvtav1_params: str = color_data.to_libsvtav1_params()
+
+    side_data_list = frame_data["side_data_list"]
+    for side_data in side_data_list:
+        if side_data["side_data_type"] == "Mastering display metadata":
+            mastering_display_data = MasteringDisplayData(side_data)
+            x265_params += ":" + mastering_display_data.to_x265_params()
+            libsvtav1_params += ":" + mastering_display_data.to_libsvtav1_params()
+            print("Mastering display metadata:")
+            print(mastering_display_data)
+            print("")
+
+        elif side_data["side_data_type"] == "Content light level metadata":
+            content_light_level_data = ContentLightLevelData(side_data)
+            x265_params += ":" + content_light_level_data.to_x265_params()
+            libsvtav1_params += ":" + content_light_level_data.to_libsvtav1_params()
+            print("Content light level metadata:")
+            print(content_light_level_data)
+            print("")
+
+    print(f"\nFFmpeg options: {color_data.to_ffmpeg_options()}\n")
+    print(f"x265 params: {x265_params}\n")
+    print(f"libsvtav1 params: {libsvtav1_params}\n")
+    print(f"libaom-av1 params: {libaom_av1_params}\n")
+
+    print("Done!")
 
 
 if __name__ == '__main__':
@@ -272,6 +316,7 @@ if __name__ == '__main__':
                               "-select_streams", str(arguments.input_stream),
                               "-print_format", "json", "-show_frames", "-read_intervals", "%+#1",
                               "-show_entries",
+                              "stream=codec_type:" +
                               "frame=pix_fmt,color_space,color_primaries,color_transfer,side_data_list",
                               "-i", arguments.input_file]
 
@@ -279,41 +324,15 @@ if __name__ == '__main__':
         result = subprocess.run(ffprobe_cmd, capture_output=True, encoding="UTF-8")
         if result.returncode == 0 and result.stdout is not None:
             metadata = json.loads(result.stdout)
-            frame_data = metadata["frames"][0]
 
-            color_data = ColorData(frame_data)
-            print("Color Data:")
-            print(color_data)
-            print("")
+            stream_codec_type = metadata["streams"][0]["codec_type"]
+            if stream_codec_type == "video":
 
-            x265_params: str = color_data.to_x265_params()
-            libaom_av1_params: str = color_data.to_libaom_av1_params()
-            libsvtav1_params: str = color_data.to_libsvtav1_params()
-
-            side_data_list = frame_data["side_data_list"]
-            for side_data in side_data_list:
-                if side_data["side_data_type"] == "Mastering display metadata":
-                    mastering_display_data = MasteringDisplayData(side_data)
-                    x265_params += ":" + mastering_display_data.to_x265_params()
-                    libsvtav1_params += ":" + mastering_display_data.to_libsvtav1_params()
-                    print("Mastering display metadata:")
-                    print(mastering_display_data)
-                    print("")
-
-                elif side_data["side_data_type"] == "Content light level metadata":
-                    content_light_level_data = ContentLightLevelData(side_data)
-                    x265_params += ":" + content_light_level_data.to_x265_params()
-                    libsvtav1_params += ":" + content_light_level_data.to_libsvtav1_params()
-                    print("Content light level metadata:")
-                    print(content_light_level_data)
-                    print("")
-
-            print(f"\nFFmpeg options: {color_data.to_ffmpeg_options()}\n")
-            print(f"x265 params: {x265_params}\n")
-            print(f"libsvtav1 params: {libsvtav1_params}\n")
-            print(f"libaom-av1 params: {libaom_av1_params}\n")
-
-            print("Done!")
+                parse_frame_data(metadata["frames"][0])
+            else:
+                print(f"Selected stream type is \"{stream_codec_type}\"")
+                print("Not a video stream!")
+                print("Exit!")
 
         else:
             print("Error executing ffprobe binary!")
