@@ -1,7 +1,7 @@
 # FFmpeg HDR Metadata Extractor
 
 **FFmpeg HDR Metadata Extractor** is a HDR metadata extractor that uses **ffprobe** in order to retrieve HDR metadata from file, and generates ffmpeg parameters based on it.
-Specifically it generates comman line parameters for three codecs available in FFmpeg:
+Specifically it generates command line parameters for three codecs available in FFmpeg:
 - x265
 - libsvtav1
 - libaom_av1
